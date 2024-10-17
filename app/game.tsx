@@ -9,6 +9,9 @@ import {  useFonts, AbrilFatface_400Regular } from '@expo-google-fonts/abril-fat
 import { useRouter } from 'expo-router';
 import getRandomWord from '@/utils/wordGenerator';
 import verifyWord from '@/utils/verifyWord';
+import Animated, { useSharedValue, useAnimatedStyle, withRepeat, withTiming, Easing } from 'react-native-reanimated';
+import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { db } from '../utils/firebaseConfig'; 
 
 //Character does not exist: 1   #A29EA3
 //Character misplaced:      2   #BDB250
@@ -18,7 +21,7 @@ const game = () => {
 
     //Game states
     const [word, setWord] = useState('APPLE'); //Current word to find
-    const [chances, setChances] = useState(0); //Number of chances played
+    const [gameStatus, setGameStatus] = useState<'None' | 'Won' | 'Lost'>('None'); //Number of chances played
     const [guess, setGuess] = useState(''); //Current guess by the user
     const [grid, setGrid] = useState(
         Array.from({ length: 6 }, () => Array.from({ length: 5 }, () => ['']))
@@ -36,10 +39,10 @@ const game = () => {
     const router = useRouter();
 
     useEffect(() => {
-        setWord(getRandomWord().toUpperCase());
-        // const w = getRandomWord();
-        // setWord(w.toUpperCase());
-        // console.log(w)
+//        setWord(getRandomWord().toUpperCase());
+        const w = getRandomWord();
+        setWord(w.toUpperCase());
+        console.log(w)
     }, []);
 
     // useEffect(() => {
@@ -61,6 +64,31 @@ const game = () => {
     //     console.log(word2);
     //     console.log(word3);
     // }, [word1, word2, word3]);
+
+    //Animations
+    const translateX = useSharedValue(0);
+    const animatedStyle = useAnimatedStyle(() => {
+        return {
+            transform: [{translateX: translateX.value}]}
+    });
+
+    const [flipped, setFlipped] = useState(false);
+    const rotation = useSharedValue(0);
+
+    const flipCard = () => {
+        rotation.value = withTiming(flipped ? 0 : 1, {
+            duration: 500,
+            easing: Easing.inOut(Easing.ease),
+        });
+        setFlipped(!flipped);
+    };
+
+    const animatedStyleFlip = useAnimatedStyle(() => {
+        const rotateX = rotation.value * Math.PI *2;
+        return {
+            transform: [{ rotateX: `${rotateX}rad` }],
+        };
+    });
 
     const [fontsLoaded] = useFonts({
         AbrilFatface_400Regular,
@@ -116,11 +144,48 @@ const game = () => {
         });
     };
 
+    const addToDb = async () => {
+        const userDocRef = doc(db, 'users', '123');
+        const userData = await getDoc(userDocRef);
+        console.log('-->', userData);
+
+        if(!userData.exists()){
+            const newData = {
+                id: 123,
+                name: 'pranaav',
+                lastKnownWinPoint: currRow,
+                gamesPlayed: 1,
+                gamesLost: 0,
+                gamesWon: 0,
+                currentStreak: 0,
+                scores: [0,0,0,0,0,0],
+            };
+            await setDoc(userDocRef, newData);
+            console.log(`User created with ID: ${newData.id}`);
+        }
+        else{
+            const data = userData.data(); 
+            const score = currRow;
+            const updatedData = {
+                ...data,
+                lastKnownWinPoint: score,
+                gamesPlayed: data.gamesPlayed + 1,
+                gamesLost: 0,
+                gamesWon: data.gamesWon + 1,
+                currentStreak: data.currentStreak + 1,
+                scores: [0,0,0,0,0,0],
+            };
+            updatedData.scores[score-1] += 1
+            await updateDoc(userDocRef, updatedData);
+        }
+    };
+
     const handleEnter = async () => {
         if(guess.length !== 5){
             return;
         }
         if(currRow === 5){
+            setGameStatus('Lost');
             setTimeout(() => router.push('/lost'), 2000);
         }
         try{
@@ -130,8 +195,12 @@ const game = () => {
             setGuess('');
             // console.log(res);
             compareWordAndSetState();
+            flipCard();
+            setGameStatus('Won');
+            addToDb();
         }
         catch(err){
+            translateX.value = withRepeat(withTiming(8, { duration: 50 }), 6, true);
             return;
         }
     };
@@ -173,7 +242,7 @@ const game = () => {
 
 
   return (
-    <View className='w-full h-full pt-[60px] bg-white'>
+    <View className='w-full h-full'>
 
         {/* Header */}
         <View className='flex flex-row justify-between items-center border-b-[1px] border-b-gray-200 pb-2'>
@@ -185,7 +254,7 @@ const game = () => {
             <View className='flex flex-row items-center space-x-3 pr-4'>
                 <TouchableOpacity><Feather name="help-circle" size={20} color="black" /></TouchableOpacity>
                 <TouchableOpacity><Entypo name="bar-graph" size={20} color="black" /></TouchableOpacity>
-                <TouchableOpacity><Ionicons name="settings-sharp" size={20} color="black" /></TouchableOpacity>
+                <TouchableOpacity onPress={() => router.push('./animated')} ><Ionicons name="settings-sharp" size={20} color="black" /></TouchableOpacity>
             </View>
         </View>
 
@@ -194,7 +263,7 @@ const game = () => {
             {
                 grid.map((row) => 
                 (
-                    <View key={grid.indexOf(row)} className='flex flex-row gap-x-[6px]'>
+                    <Animated.View key={grid.indexOf(row)} className='flex flex-row gap-x-[6px]' style={[{},currRow === grid.indexOf(row) && animatedStyle || currRow-1 === grid.indexOf(row) && animatedStyleFlip]}>
                     {
                         row.map(
                             (item) =>
@@ -217,7 +286,7 @@ const game = () => {
                             ) 
                         )
                     }
-                    </View>
+                    </Animated.View>
                 )
                 )
             }
