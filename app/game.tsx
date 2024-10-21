@@ -12,6 +12,7 @@ import verifyWord from '@/utils/verifyWord';
 import Animated, { useSharedValue, useAnimatedStyle, withRepeat, withTiming, Easing } from 'react-native-reanimated';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../utils/firebaseConfig'; 
+import { Audio } from 'expo-av';
 
 //Character does not exist: 1   #A29EA3
 //Character misplaced:      2   #BDB250
@@ -45,25 +46,6 @@ const game = () => {
         console.log(w)
     }, []);
 
-    // useEffect(() => {
-    //     const printGrid = () => {
-    //         for(const row of grid){
-    //             console.log(row);
-    //         }
-    //         console.log('\n');
-    //     };
-    //     printGrid();
-    // }, [grid]);
-
-    // useEffect(() => {
-    //     console.log(guess);
-    // }, [guess]);
-
-    // useEffect(() => {
-    //     console.log(word1);
-    //     console.log(word2);
-    //     console.log(word3);
-    // }, [word1, word2, word3]);
 
     //Animations
     const translateX = useSharedValue(0);
@@ -89,6 +71,13 @@ const game = () => {
             transform: [{ rotateX: `${rotateX}rad` }],
         };
     });
+
+    const playSound = async () => {
+      const { sound } = await Audio.Sound.createAsync(
+        require('@/assets/sounds/win.mp3') // Change this to your audio file path
+      );
+      await sound.playAsync(); 
+    };
 
     const [fontsLoaded] = useFonts({
         AbrilFatface_400Regular,
@@ -147,36 +136,52 @@ const game = () => {
     const addToDb = async () => {
         const userDocRef = doc(db, 'users', '123');
         const userData = await getDoc(userDocRef);
-        console.log('-->', userData);
+        // console.log('-->', userData);
 
         if(!userData.exists()){
             const newData = {
-                id: 123,
+                id: '123',
                 name: 'pranaav',
                 lastKnownWinPoint: currRow,
-                gamesPlayed: 1,
+                gamesPlayed: 0,
                 gamesLost: 0,
                 gamesWon: 0,
                 currentStreak: 0,
                 scores: [0,0,0,0,0,0],
             };
             await setDoc(userDocRef, newData);
-            console.log(`User created with ID: ${newData.id}`);
+            // console.log(`User created with ID: ${newData.id}`);
         }
         else{
-            const data = userData.data(); 
-            const score = currRow;
-            const updatedData = {
-                ...data,
-                lastKnownWinPoint: score,
-                gamesPlayed: data.gamesPlayed + 1,
-                gamesLost: 0,
-                gamesWon: data.gamesWon + 1,
-                currentStreak: data.currentStreak + 1,
-                scores: [0,0,0,0,0,0],
-            };
-            updatedData.scores[score-1] += 1
-            await updateDoc(userDocRef, updatedData);
+            if(currRow === 5) {
+                //Game Lost
+                const data = userData.data(); 
+                const score = currRow+1;
+                const updatedData = {
+                    ...data,
+                    lastKnownWinPoint: score,
+                    gamesPlayed: data.gamesPlayed + 1,
+                    gamesLost: data.gamesLost+1,
+                    currentStreak: 0,
+                };
+                await updateDoc(userDocRef, updatedData);
+            }
+            else{
+                //Game Win
+                const data = userData.data(); 
+                const score = currRow+1;
+                const updatedData = {
+                    ...data,
+                    lastKnownWinPoint: score,
+                    gamesPlayed: data.gamesPlayed + 1,
+                    gamesLost: 0,
+                    gamesWon: data.gamesWon + 1,
+                    currentStreak: data.currentStreak + 1,
+                    scores: data.scores
+                };
+                updatedData.scores[currRow] += 1;
+                await updateDoc(userDocRef, updatedData);
+            }
         }
     };
 
@@ -238,11 +243,14 @@ const game = () => {
         });
     };
     
-    const handleWin = () => setTimeout(() => router.push('/win'), 5000)
+    const handleWin = () => {
+        playSound();
+        setTimeout(() => router.push('/win'), 5000)
+    }
 
 
   return (
-    <View className='w-full h-full'>
+    <View className='w-full h-full pt-[50px] bg-white'>
 
         {/* Header */}
         <View className='flex flex-row justify-between items-center border-b-[1px] border-b-gray-200 pb-2'>

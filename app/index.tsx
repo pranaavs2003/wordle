@@ -59,7 +59,7 @@ const Index = () => {
       </SignedIn>
 
       {/* bottomSheet.openBottomSheet() */}
-      <TouchableOpacity onPress={() => router.push('/animated')} className="border-[1px] pl-10 pr-10 pt-3 pb-3 rounded-full w-[39%] mt-2 dark:bg-[#D1B036] border-none">
+      <TouchableOpacity onPress={() => bottomSheet.openBottomSheet()} className="border-[1px] pl-10 pr-10 pt-3 pb-3 rounded-full w-[39%] mt-2 dark:bg-[#D1B036] border-none">
         <Text className="text-center font-medium dark:text-white">Subscribe</Text>
       </TouchableOpacity>
 

@@ -1,5 +1,4 @@
 import React from 'react'
-import index from '.'
 import { Stack } from 'expo-router'
 import {BottomSheetProvider} from "@/components/BottomSheetProvider";
 import { ClerkProvider, ClerkLoaded } from '@clerk/clerk-expo'
@@ -18,7 +17,7 @@ const RootLayout = () => {
     <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
       <ClerkLoaded>
         <BottomSheetProvider>
-          <Stack initialRouteName='login'>
+          <Stack initialRouteName='game'>
             
             <Stack.Screen 
               name="index" 
